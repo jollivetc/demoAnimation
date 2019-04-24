@@ -8,6 +8,8 @@ import com.google.ar.core.Anchor;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
 import com.google.ar.sceneform.AnchorNode;
+import com.google.ar.sceneform.math.Quaternion;
+import com.google.ar.sceneform.math.Vector3;
 import com.google.ar.sceneform.rendering.ViewRenderable;
 import com.google.ar.sceneform.ux.ArFragment;
 
@@ -48,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
                     // Create CardNode and attach to the Anchor.
                     CardNode cardNode = new CardNode(anchorNode);
                     //cardNode.setParent(anchorNode);
+                    cardNode.setLocalRotation(new Quaternion(new Vector3(-90f,0f,0f)));
                     cardNode.setRenderable(card);
                 });
     }
