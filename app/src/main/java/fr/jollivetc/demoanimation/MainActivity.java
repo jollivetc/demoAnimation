@@ -18,6 +18,7 @@ public class MainActivity extends AppCompatActivity {
     private ArFragment arFragment;
     private ViewRenderable card;
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -49,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
 
                     // Create CardNode and attach to the Anchor.
                     CardNode cardNode = new CardNode(anchorNode);
-                    //cardNode.setParent(anchorNode);
                     cardNode.setLocalRotation(new Quaternion(new Vector3(-90f,0f,0f)));
                     cardNode.setRenderable(card);
                 });
