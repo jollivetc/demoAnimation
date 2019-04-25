@@ -3,7 +3,6 @@ package fr.jollivetc.demoanimation;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.animation.AccelerateDecelerateInterpolator;
 
@@ -18,16 +17,16 @@ import com.google.ar.sceneform.math.Vector3Evaluator;
 
 public class CardNode extends Node implements Node.OnTapListener {
 
-    private boolean isPresented;
-    private AnchorNode anchor;
+    private boolean isFocused;
+    private AnchorNode anchorNode;
     private ObjectAnimator positionAnimator;
     private ObjectAnimator orientationAnimator;
 
-    public CardNode(AnchorNode anchor){
-        this.anchor = anchor;
-        isPresented = false;
+    public CardNode(AnchorNode anchorNode){
+        this.anchorNode = anchorNode;
+        isFocused = false;
         setOnTapListener(this);
-        this.setParent(anchor);
+        this.setParent(anchorNode);
     }
 
 
@@ -44,76 +43,100 @@ public class CardNode extends Node implements Node.OnTapListener {
 
     @Override
     public void onTap(HitTestResult hitTestResult, MotionEvent motionEvent) {
-        if (isPresented){
-
-            Vector3 startWorldPosition = this.getWorldPosition();
-            Quaternion startWorldRotation = this.getWorldRotation();
-            Vector3 finalWorldPosition = anchor.getWorldPosition();
-            Node temporaryfinalNode = new Node();
-            temporaryfinalNode.setParent(anchor);
-            temporaryfinalNode.setLocalRotation(new Quaternion(new Vector3(-90f,0f,0f)));
-            Quaternion finalWorldRotation = temporaryfinalNode.getWorldRotation();
-
-            positionAnimator = new ObjectAnimator();
-            positionAnimator.setObjectValues((Object[]) new Vector3[]{startWorldPosition, finalWorldPosition});
-            positionAnimator.setEvaluator(new Vector3Evaluator());
-            positionAnimator.setDuration(1000);
-            positionAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
-            positionAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    Log.i("DEMO_ANIMATION", "end of animation");
-                    CardNode.this.setParent(anchor);
-                    CardNode.this.setLocalPosition(new Vector3(0.0f,0.0f,0.0f));
-                    CardNode.this.setLocalRotation(new Quaternion(new Vector3(-90f,0f,0f)));
-                    positionAnimator = null;
-                    orientationAnimator = null;
-                }
-            });
-            orientationAnimator = new ObjectAnimator();
-            orientationAnimator.setObjectValues((Object[])new Quaternion[]{startWorldRotation, finalWorldRotation});
-            orientationAnimator.setEvaluator(new QuaternionEvaluator());
-            orientationAnimator.setDuration(1000);
-            orientationAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
-            positionAnimator.start();
-            orientationAnimator.start();
+        if (isFocused){
+            prepareAnimationsToSendCardToAnchor();
         }else{
-            Vector3 startWorldPosition = this.getWorldPosition();
-            Quaternion startWorldRotation = this.getWorldRotation();
-            Node temporaryDestinationNode = new Node();
-            temporaryDestinationNode.setParent(getScene().getCamera());
-            temporaryDestinationNode.setLocalPosition(new Vector3(0.0f, 0.0f, -1.0f));
-            temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(0f,0f,0f)));
-            Vector3 finalWorldPosition = temporaryDestinationNode.getWorldPosition();
-            Quaternion finalWorldRotation = temporaryDestinationNode.getWorldRotation();
-            positionAnimator = new ObjectAnimator();
-            positionAnimator.setObjectValues((Object[]) new Vector3[]{startWorldPosition, finalWorldPosition});
-            positionAnimator.setEvaluator(new Vector3Evaluator());
-            positionAnimator.setDuration(1000);
-            positionAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
-            positionAnimator.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    Log.i("DEMO_ANIMATION", "end of animation");
-                    CardNode.this.setParent(getScene().getCamera());
-                    CardNode.this.setLocalPosition(new Vector3(0.0f, 0.0f, -1.0f));
-                    CardNode.this.setLocalRotation(new Quaternion(new Vector3(0f,0f,0f)));
-                    positionAnimator = null;
-                    orientationAnimator = null;
-                }
-            });
-            orientationAnimator = new ObjectAnimator();
-            orientationAnimator.setObjectValues((Object[])new Quaternion[]{startWorldRotation, finalWorldRotation});
-            orientationAnimator.setEvaluator(new QuaternionEvaluator());
-            orientationAnimator.setDuration(1000);
-            orientationAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
-            positionAnimator.start();
-            orientationAnimator.start();
+            prepareAnimationsToBringCardToFront();
         }
-        this.isPresented = !this.isPresented;
+        positionAnimator.start();
+        orientationAnimator.start();
+        this.isFocused = !this.isFocused;
 
+    }
 
+    private void prepareAnimationsToBringCardToFront() {
+        //Create a temporary node at destination (1 meter in front of camera) with orientation
+        final Node temporaryDestinationNode = new Node();
+        setNode1MeterInFrontCamera(temporaryDestinationNode);
+        //compute start and end position
+        buildAnimators(temporaryDestinationNode);
+        //clean temporary node
+        temporaryDestinationNode.setParent(null);
+        //at the end of animation, attach the card in front of the camera
+        positionAnimator.addListener(createFocusAnimationEndListener());
+    }
 
+    private void prepareAnimationsToSendCardToAnchor() {
+        // create a temporary node at destination (at anchorNode) with orientation (laying flat)
+        final Node temporaryDestinationNode = new Node();
+        setNodeAtAnchor(temporaryDestinationNode);
+        //build animators
+        buildAnimators(temporaryDestinationNode);
+        //clean temporary node
+        temporaryDestinationNode.setParent(null);
+        //at the end of animation, attach the card to the anchorNode.
+        positionAnimator.addListener(createReturnAnimationEndListener());
+    }
 
+    private AnimatorListenerAdapter createFocusAnimationEndListener() {
+        return new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                setNode1MeterInFrontCamera(CardNode.this);
+                positionAnimator = null;
+                orientationAnimator = null;
+            }
+        };
+    }
+
+    private AnimatorListenerAdapter createReturnAnimationEndListener() {
+        return new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                setNodeAtAnchor(CardNode.this);
+                positionAnimator = null;
+                orientationAnimator = null;
+            }
+        };
+    }
+
+    private void setNodeAtAnchor(Node temporaryDestinationNode) {
+        temporaryDestinationNode.setParent(anchorNode);
+        temporaryDestinationNode.setLocalPosition(new Vector3(0f, 0f, 0f));
+        temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(-90f, 0f, 0f)));
+    }
+
+    private void setNode1MeterInFrontCamera(Node temporaryDestinationNode) {
+        temporaryDestinationNode.setParent(getScene().getCamera());
+        temporaryDestinationNode.setLocalPosition(new Vector3(0.0f, 0.0f, -1.0f));
+        temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(0f, 0f, 0f)));
+    }
+
+    private void buildAnimators(Node temporaryDestinationNode) {
+        //compute the start and end position
+        Vector3 startWorldPosition = this.getWorldPosition();
+        Vector3 finalWorldPosition = temporaryDestinationNode.getWorldPosition();
+        //compute the start and end rotation
+        Quaternion startWorldRotation = this.getWorldRotation();
+        Quaternion finalWorldRotation = temporaryDestinationNode.getWorldRotation();
+
+        buildOrientationAnimator(startWorldRotation, finalWorldRotation);
+        buildPositionAnimator(startWorldPosition, finalWorldPosition);
+    }
+
+    private void buildPositionAnimator(Vector3 startWorldPosition, Vector3 finalWorldPosition) {
+        positionAnimator = new ObjectAnimator();
+        positionAnimator.setObjectValues((Object[]) new Vector3[]{startWorldPosition, finalWorldPosition});
+        positionAnimator.setEvaluator(new Vector3Evaluator());
+        positionAnimator.setDuration(1000);
+        positionAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+    }
+
+    private void buildOrientationAnimator(Quaternion startWorldRotation, Quaternion finalWorldRotation) {
+        orientationAnimator = new ObjectAnimator();
+        orientationAnimator.setObjectValues((Object[]) new Quaternion[]{startWorldRotation, finalWorldRotation});
+        orientationAnimator.setEvaluator(new QuaternionEvaluator());
+        orientationAnimator.setDuration(1000);
+        orientationAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
     }
 }
