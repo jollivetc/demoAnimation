@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
                     AnchorNode anchorNode = new AnchorNode(anchor);
                     anchorNode.setParent(arFragment.getArSceneView().getScene());
 
+
                     // Create CardNode and attach to the Anchor.
                     CardNode cardNode = new CardNode(anchorNode);
                     cardNode.setLocalRotation(new Quaternion(new Vector3(-90f,0f,0f)));

@@ -19,8 +19,9 @@ public class CardNode extends Node implements Node.OnTapListener {
 
     private boolean isFocused;
     private AnchorNode anchorNode;
-    private ObjectAnimator positionAnimator;
-    private ObjectAnimator orientationAnimator;
+    private ObjectAnimator posePositionAnimator;
+    private ObjectAnimator poseOrientationAnimator;
+
 
     public CardNode(AnchorNode anchorNode){
         this.anchorNode = anchorNode;
@@ -33,11 +34,11 @@ public class CardNode extends Node implements Node.OnTapListener {
     @Override
     public void onUpdate(FrameTime frameTime) {
         super.onUpdate(frameTime);
-        if(positionAnimator != null){
-            this.setWorldPosition((Vector3) positionAnimator.getAnimatedValue());
+        if(posePositionAnimator != null){
+            this.setLocalPosition((Vector3) posePositionAnimator.getAnimatedValue());
         }
-        if(orientationAnimator != null){
-            this.setWorldRotation((Quaternion)orientationAnimator.getAnimatedValue());
+        if(poseOrientationAnimator != null){
+            this.setLocalRotation((Quaternion) poseOrientationAnimator.getAnimatedValue());
         }
     }
 
@@ -48,54 +49,46 @@ public class CardNode extends Node implements Node.OnTapListener {
         }else{
             prepareAnimationsToBringCardToFront();
         }
-        positionAnimator.start();
-        orientationAnimator.start();
+        posePositionAnimator.start();
+        poseOrientationAnimator.start();
         this.isFocused = !this.isFocused;
-
     }
 
     private void prepareAnimationsToBringCardToFront() {
-        //Create a temporary node at destination (1 meter in front of camera) with orientation
-        final Node temporaryDestinationNode = new Node();
-        setNode1MeterInFrontCamera(temporaryDestinationNode);
-        //compute start and end position
-        buildAnimators(temporaryDestinationNode);
-        //clean temporary node
-        temporaryDestinationNode.setParent(null);
-        //at the end of animation, attach the card in front of the camera
-        positionAnimator.addListener(createFocusAnimationEndListener());
+        Vector3 worldPositionAnchor = this.getWorldPosition();
+        Quaternion worldRotation = this.getWorldRotation();
+        //compute destination
+        Node destination = new Node();
+        setNode1MeterInFrontCamera(destination);
+        //Attach to camera and restore World position and orientation
+        this.setParent(this.getScene().getCamera());
+        this.setWorldPosition(worldPositionAnchor);
+        this.setWorldRotation(worldRotation);
+
+        buildPoseAnimators(this, destination);
+        poseOrientationAnimator.addListener(createEndOfAnimationListener());
     }
 
     private void prepareAnimationsToSendCardToAnchor() {
-        // create a temporary node at destination (at anchorNode) with orientation (laying flat)
-        final Node temporaryDestinationNode = new Node();
-        setNodeAtAnchor(temporaryDestinationNode);
-        //build animators
-        buildAnimators(temporaryDestinationNode);
-        //clean temporary node
-        temporaryDestinationNode.setParent(null);
-        //at the end of animation, attach the card to the anchorNode.
-        positionAnimator.addListener(createReturnAnimationEndListener());
+        Vector3 worldPosition = this.getWorldPosition();
+        Quaternion worldRotation = this.getWorldRotation();
+
+        Node destination = new Node();
+        setNodeAtAnchor(destination);
+        this.setParent(destination);
+        this.setWorldRotation( worldRotation);
+        this.setWorldPosition(worldPosition);
+
+        buildPoseAnimators(this, destination);
+        poseOrientationAnimator.addListener(createEndOfAnimationListener());
     }
 
-    private AnimatorListenerAdapter createFocusAnimationEndListener() {
+    private AnimatorListenerAdapter createEndOfAnimationListener(){
         return new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                setNode1MeterInFrontCamera(CardNode.this);
-                positionAnimator = null;
-                orientationAnimator = null;
-            }
-        };
-    }
-
-    private AnimatorListenerAdapter createReturnAnimationEndListener() {
-        return new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                setNodeAtAnchor(CardNode.this);
-                positionAnimator = null;
-                orientationAnimator = null;
+                poseOrientationAnimator = null;
+                posePositionAnimator = null;
             }
         };
     }
@@ -103,7 +96,7 @@ public class CardNode extends Node implements Node.OnTapListener {
     private void setNodeAtAnchor(Node temporaryDestinationNode) {
         temporaryDestinationNode.setParent(anchorNode);
         temporaryDestinationNode.setLocalPosition(new Vector3(0f, 0f, 0f));
-        temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(-90f, 0f, 0f)));
+        temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(-45f, 0f, 0f)));
     }
 
     private void setNode1MeterInFrontCamera(Node temporaryDestinationNode) {
@@ -112,31 +105,29 @@ public class CardNode extends Node implements Node.OnTapListener {
         temporaryDestinationNode.setLocalRotation(new Quaternion(new Vector3(0f, 0f, 0f)));
     }
 
-    private void buildAnimators(Node temporaryDestinationNode) {
-        //compute the start and end position
-        Vector3 startWorldPosition = this.getWorldPosition();
-        Vector3 finalWorldPosition = temporaryDestinationNode.getWorldPosition();
-        //compute the start and end rotation
-        Quaternion startWorldRotation = this.getWorldRotation();
-        Quaternion finalWorldRotation = temporaryDestinationNode.getWorldRotation();
+    private void buildPoseAnimators(Node origin, Node destination){
+        Vector3 originPosition = origin.getLocalPosition();
+        Quaternion originRotation = origin.getLocalRotation();
+        Vector3 destinationPosition = destination.getLocalPosition();
+        Quaternion destinationRotation = destination.getLocalRotation();
 
-        buildOrientationAnimator(startWorldRotation, finalWorldRotation);
-        buildPositionAnimator(startWorldPosition, finalWorldPosition);
+        buildOrientationAnimator(originRotation, destinationRotation);
+        buildPositionAnimator(originPosition, destinationPosition);
     }
 
     private void buildPositionAnimator(Vector3 startWorldPosition, Vector3 finalWorldPosition) {
-        positionAnimator = new ObjectAnimator();
-        positionAnimator.setObjectValues((Object[]) new Vector3[]{startWorldPosition, finalWorldPosition});
-        positionAnimator.setEvaluator(new Vector3Evaluator());
-        positionAnimator.setDuration(1000);
-        positionAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        posePositionAnimator = new ObjectAnimator();
+        posePositionAnimator.setObjectValues((Object[]) new Vector3[]{startWorldPosition, finalWorldPosition});
+        posePositionAnimator.setEvaluator(new Vector3Evaluator());
+        posePositionAnimator.setDuration(1000);
+        posePositionAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
     }
 
     private void buildOrientationAnimator(Quaternion startWorldRotation, Quaternion finalWorldRotation) {
-        orientationAnimator = new ObjectAnimator();
-        orientationAnimator.setObjectValues((Object[]) new Quaternion[]{startWorldRotation, finalWorldRotation});
-        orientationAnimator.setEvaluator(new QuaternionEvaluator());
-        orientationAnimator.setDuration(1000);
-        orientationAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        poseOrientationAnimator = new ObjectAnimator();
+        poseOrientationAnimator.setObjectValues((Object[]) new Quaternion[]{startWorldRotation, finalWorldRotation});
+        poseOrientationAnimator.setEvaluator(new QuaternionEvaluator());
+        poseOrientationAnimator.setDuration(1000);
+        poseOrientationAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
     }
 }
